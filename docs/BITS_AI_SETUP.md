@@ -12,47 +12,50 @@ test and an incident write-up → CI validates it.
 
 ## 1. Put the code on GitHub (Bits AI needs it to read code and open PRs)
 
-```bash
-cd "datadogs environment"
-git init -b main && git add . && git commit -m "Initial ShopLite sandbox"
-```
+Already done: https://github.com/AaronDave909/shoplite. The `incident-validation` CI job is
+**red on main**. That's intended: it replays the bug.
 
-Create an empty repo named `shoplite` on github.com, then:
+## 2. Add your Datadog API key as a Codespaces secret
 
-```bash
-git remote add origin https://github.com/YOUR_GITHUB_USER/shoplite.git
-git push -u origin main
-```
+Nothing is installed on your own computer. The app and the Datadog Agent run in a GitHub
+Codespace (a cloud Linux machine).
 
-The `incident-validation` CI job will be **red on main**. That's intended: it replays the bug.
+1. In Datadog: **Organization Settings → API Keys → New Key**, name it `shoplite-codespace`.
+   Use a dedicated key so you can revoke it on its own later.
+2. On GitHub: your profile **Settings → Codespaces → Secrets → New secret**:
+   - `DD_API_KEY` = the key. Under *Repository access*, pick only `shoplite`.
+   - `DD_SITE` = your Datadog site (the domain in your Datadog URL, e.g. `datadoghq.com`,
+     `us5.datadoghq.com`, `datadoghq.eu`). Same repo access.
 
-## 2. Install the Datadog Agent on your Mac
+Never put the key in `.env` or anywhere in the repo.
 
-No Docker on this machine, so use the native Agent. In Datadog: **Integrations → Agent → macOS**
-gives you a one-line installer with your API key filled in. Then:
+## 3. Start a Codespace and run the app
 
-1. Turn on log collection: edit `/opt/datadog-agent/etc/datadog.yaml` and set `logs_enabled: true`.
-   (APM is on by default and listens on `localhost:8126`.)
-2. Copy `datadog/conf.d/nodejs.d/conf.yaml` to `/opt/datadog-agent/etc/conf.d/nodejs.d/conf.yaml`
-   and change `path:` to the absolute path of this project's `logs/shoplite.log`.
-3. Restart the Agent (Datadog Agent menu-bar app → Restart) and check `datadog-agent status`
-   shows the APM Agent and the `nodejs` log source.
+1. On the repo page: **Code → Codespaces → Create codespace on main**.
+2. First start takes a few minutes. Setup installs packages, writes `.env` (with your repo URL
+   for Source Code Integration) and starts the Datadog Agent container.
+3. In the Codespace terminal:
 
-(With Docker Desktop installed you can instead put `DD_API_KEY` in `.env` and run
-`docker compose up --build`.)
+   ```bash
+   npm start
+   ```
 
-## 3. Run the app
+   Codespaces pops up a link for port 3000. That's the ShopLite page. The port is private by
+   default, so only you (signed in to GitHub) can open it.
+4. Check the Agent: `docker compose exec datadog-agent agent status` should show the APM Agent
+   receiving traces and a `nodejs` log source. If the Agent didn't start, run
+   `bash .devcontainer/start-agent.sh` and read the message.
 
-```bash
-cp .env.example .env   # set DD_GIT_REPOSITORY_URL to your GitHub repo
-npm install
-npm start              # http://localhost:3000
-```
-
-Optional baseline traffic in another terminal: `npm run traffic`.
+Optional baseline traffic in a second terminal: `npm run traffic`.
 
 Within a couple of minutes you should see `service:shoplite` in **APM → Services** and logs in
 **Logs** with a trace link on each line.
+
+Codespaces stop after 30 minutes idle and use your free monthly hours while running. Stop or
+delete the Codespace from github.com/codespaces when you're done.
+
+(Prefer your own machine? With Docker Desktop: put `DD_API_KEY` in `.env`, run
+`docker compose up -d datadog-agent`, then `npm start`.)
 
 ## 4. Connect GitHub to Datadog
 
@@ -62,6 +65,8 @@ Within a couple of minutes you should see `service:shoplite` in **APM → Servic
 2. **Source Code Integration** is already wired: the app sends `DD_GIT_REPOSITORY_URL` and
    `DD_GIT_COMMIT_SHA` (set by `scripts/start.sh`). Commit and push before running so the SHA
    exists on GitHub. Stack frames in Error Tracking will then link to the exact line.
+3. Keep the GitHub App limited to the `shoplite` repo, and protect `main` (Settings → Branches)
+   so changes land only through reviewed PRs with passing CI. Bits AI opens PRs; you merge.
 
 ## 5. Create the monitor and turn on Bits AI SRE
 
@@ -72,7 +77,7 @@ Within a couple of minutes you should see `service:shoplite` in **APM → Servic
 
 ## 6. Break it
 
-Open http://localhost:3000 and click **Fire 20 broken checkouts** (or `npm run traffic -- http://localhost:3000 30`
+Open the ShopLite page (the forwarded port 3000 link) and click **Fire 20 broken checkouts** (or `npm run traffic -- http://localhost:3000 30`
 for a sustained 30% error rate). The monitor should alert within ~5 minutes.
 
 What you should see:
@@ -99,7 +104,7 @@ On the PR, CI runs:
 - `npm run validate`: replays the incident (expired promo, unknown promo, valid promo, empty cart).
   It fails on today's code and should pass on the fix.
 
-Merge, pull, restart `npm start`, click the red button again: it should now return
+Merge, then in the Codespace `git pull` and restart `npm start`, click the red button again: it should now return
 **HTTP 400 "Promo code is invalid or expired"** (or similar), and the monitor recovers.
 
 ## Resetting for another run

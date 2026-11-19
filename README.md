@@ -16,14 +16,13 @@ npm install
 npm run start:no-dd      # http://localhost:3000
 ```
 
-## With Datadog
+## With Datadog (GitHub Codespaces, nothing installed locally)
 
-```bash
-cp .env.example .env     # edit DD_GIT_REPOSITORY_URL
-npm start                # loads .env, adds git SHA, starts with dd-trace
-```
+1. Add `DD_API_KEY` and `DD_SITE` as Codespaces secrets for this repo.
+2. **Code → Codespaces → Create codespace.** Setup starts the Datadog Agent in a container.
+3. Run `npm start` and open the forwarded port 3000.
 
-Requires a Datadog Agent on `localhost:8126` (see the setup guide).
+Details in the setup guide.
 
 ## Layout
 
@@ -36,6 +35,7 @@ Requires a Datadog Agent on `localhost:8126` (see the setup guide).
 | `scripts/validate.js` | Incident replay (`npm run validate`, **fails until fixed**) |
 | `scripts/traffic.js` | Background traffic generator (`npm run traffic -- <url> <error%>`) |
 | `datadog/` | Agent log config and an importable monitor |
+| `.devcontainer/` | Codespaces setup: Node 20 + Docker, starts the Datadog Agent |
 | `AGENTS.md` | What a fix PR must include (fix, test, incident doc, changelog) |
 | `docs/` | Runbook, incident template, Bits AI setup |
 | `.github/workflows/ci.yml` | Runs tests and incident validation on every PR |

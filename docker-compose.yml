@@ -1,10 +1,15 @@
-# Optional: run the app and the Datadog Agent in containers (needs Docker Desktop).
-# Without Docker, install the native macOS Agent instead (see README).
+# Runs the Datadog Agent (and optionally the app) in containers.
+# In GitHub Codespaces, .devcontainer/start-agent.sh starts only `datadog-agent`;
+# the app runs with `npm start` and reaches the Agent on localhost:8126.
+# DD_API_KEY / DD_SITE come from the shell environment (Codespaces secrets),
+# falling back to values in .env for local Docker use.
 services:
   datadog-agent:
     image: gcr.io/datadoghq/agent:7
-    env_file: .env
     environment:
+      DD_API_KEY: ${DD_API_KEY:?Set DD_API_KEY (Codespaces secret or .env)}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_ENV: sandbox
       DD_APM_ENABLED: "true"
       DD_APM_NON_LOCAL_TRAFFIC: "true"
       DD_LOGS_ENABLED: "true"
