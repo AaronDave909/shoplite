@@ -1,0 +1,29 @@
+# Optional: run the app and the Datadog Agent in containers (needs Docker Desktop).
+# Without Docker, install the native macOS Agent instead (see README).
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    env_file: .env
+    environment:
+      DD_APM_ENABLED: "true"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_LOGS_ENABLED: "true"
+      DD_HOSTNAME: shoplite-sandbox
+    volumes:
+      - ./datadog/conf.d/nodejs.d:/conf.d/nodejs.d:ro
+      - ./logs:/app/logs:ro
+    ports:
+      - "8126:8126"
+
+  shoplite:
+    build: .
+    env_file: .env
+    environment:
+      DD_AGENT_HOST: datadog-agent
+      LOG_FILE: /app/logs/shoplite.log
+    volumes:
+      - ./logs:/app/logs
+    ports:
+      - "3000:3000"
+    depends_on:
+      - datadog-agent

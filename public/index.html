@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShopLite</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>ShopLite</h1>
+    <p class="sub">Sample store for Datadog APM, logs, Error Tracking and Bits AI.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Products</h2>
+      <ul id="products" class="products"></ul>
+    </section>
+
+    <section>
+      <h2>Checkout</h2>
+      <label for="promo">Promo code</label>
+      <input id="promo" placeholder="SAVE10, WELCOME5, …" autocomplete="off" />
+      <div class="actions">
+        <button id="checkout">Place order</button>
+      </div>
+    </section>
+
+    <section class="danger">
+      <h2>Trigger the incident</h2>
+      <p>Checks out with the expired promo code <code>BLACKFRIDAY</code>. The server crashes with a
+        500 because of a real bug in <code>src/promotions.js</code>. This is the error Bits AI should find and fix.</p>
+      <div class="actions">
+        <button id="break" class="warn">Apply expired promo (causes 500)</button>
+        <button id="burst" class="warn ghost">Fire 20 broken checkouts</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Result</h2>
+      <pre id="out">Nothing yet.</pre>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "shoplite",
+  "version": "1.0.0",
+  "description": "Sample storefront instrumented with Datadog APM, logs and Error Tracking, with an intentional bug for Bits AI root cause analysis.",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "./scripts/start.sh",
+    "start:no-dd": "node src/server.js",
+    "test": "node --test test/",
+    "validate": "node scripts/validate.js",
+    "traffic": "node scripts/traffic.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dd-trace": "^5.136.0",
+    "express": "^5.3.0",
+    "pino": "^10.4.0"
+  }
+}
