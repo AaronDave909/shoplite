@@ -39,3 +39,13 @@ test('POST /api/checkout returns 400 for bad input', async () => {
   const res = await post({ items: [] });
   assert.equal(res.status, 400);
 });
+
+for (const [name, promoCode] of [['unknown', 'NOTACODE'], ['expired', 'BLACKFRIDAY']]) {
+  test(`POST /api/checkout returns 400 for ${name} promo without creating an order`, async () => {
+    const res = await post({ items: [{ productId: 'mug', quantity: 1 }], promoCode });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /Unknown or expired promotion code/);
+    assert.equal(body.orderId, undefined);
+  });
+}

@@ -29,7 +29,26 @@ test('rejects unknown products', () => {
 
 test('promo is valid through the end of its expiry day', () => {
   assert.ok(findActivePromotion('BLACKFRIDAY', new Date('2025-11-30T23:00:00Z')));
+  assert.equal(calculateDiscount(10000, 'BLACKFRIDAY', new Date('2025-11-30T23:59:59.999Z')), 2500);
   assert.equal(findActivePromotion('BLACKFRIDAY', new Date('2025-12-01T00:00:00Z')), undefined);
+});
+
+test('rejects an unknown promo code as validation input', () => {
+  assert.throws(
+    () => calculateDiscount(10000, 'NOTACODE'),
+    (error) => error instanceof ValidationError && error.status === 400 && /Unknown or expired/.test(error.message),
+  );
+});
+
+test('rejects an expired promo code as validation input', () => {
+  assert.throws(
+    () => calculateDiscount(10000, 'BLACKFRIDAY', new Date('2025-12-01T00:00:00Z')),
+    (error) => error instanceof ValidationError && error.status === 400 && /Unknown or expired/.test(error.message),
+  );
+});
+
+test('keeps empty promo codes free of discount and validation errors', () => {
+  assert.equal(calculateDiscount(10000, ''), 0);
 });
 
 test('discount math for an active code', () => {
