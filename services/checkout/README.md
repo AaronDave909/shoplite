@@ -53,4 +53,10 @@ npm test -w services/checkout
 
 <!-- Append one entry per incident (newest last). Format: see AGENTS.md. -->
 
-_No incidents yet._
+### 2026-11-23: Handle missing promotion discounts as invalid input
+
+- **Root cause:** `src/orders.js:75` dereferenced `promo.discount.amountCents` before the fix after promo-service returned `{ discount: null }` for `LEGACY_VIP` whose legacy tiers had all expired, causing `TypeError: Cannot read properties of null (reading 'amountCents')` and HTTP 500.
+- **Affected service / database:** `checkout-service` / `orders-db`; the malformed response originated in `promo-service` / `promo-db`.
+- **Datadog links:** [Bits investigation](https://app.datadoghq.com/bits-ai/investigations/5da71a10-1697-4466-bc6f-343da8857fcf?type=CONCLUSION).
+- **Fix:** `placeOrder` now maps a missing promotion discount to the existing 400 `ValidationError`, while promo-service rejects the invalid legacy promotion at its source.
+- **Validation steps:** `test/orders.test.js` ("a promo without a discount is a 400 and reserves nothing"); `npm test`; `npm run validate`; in the running stack, submit `LEGACY_VIP` through the checkout flow and expect HTTP 400 rather than 500.

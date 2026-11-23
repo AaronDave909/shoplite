@@ -6,5 +6,5 @@ INSERT INTO promotions (code, rule_type, percent, legacy_rules, expires_on) VALU
   ('LEGACY_VIP',  'legacy_tiered', NULL,
      '[{"minSubtotalCents": 0, "percent": 15, "validUntil": "2024-06-30"},
        {"minSubtotalCents": 10000, "percent": 20, "validUntil": "2024-06-30"}]',
-     '2099-12-31')
+     '2024-06-30')
 ON CONFLICT (code) DO NOTHING;

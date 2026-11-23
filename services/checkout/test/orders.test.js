@@ -80,6 +80,15 @@ test('an invalid promo is a 400 and reserves nothing', async () => {
   assert.equal(clients.calls.reserve.length, 0);
 });
 
+test('a promo without a discount is a 400 and reserves nothing', async () => {
+  const clients = fakeClients({ promo: async () => ({ code: 'LEGACY_VIP', discount: null }) });
+  await assert.rejects(
+    placeOrder({ db, clients }, { items: [{ productId: 'mug', quantity: 1 }], promoCode: 'LEGACY_VIP' }),
+    (err) => err instanceof ValidationError && /Unknown or expired/.test(err.message),
+  );
+  assert.equal(clients.calls.reserve.length, 0);
+});
+
 test('bad carts are a 400', async () => {
   const clients = fakeClients();
   await assert.rejects(placeOrder({ db, clients }, { items: [] }), ValidationError);
