@@ -1,18 +1,11 @@
 {
-  "name": "[shoplite] checkout-service 5xx errors",
+  "name": "[shoplite] Checkout 5xx errors",
   "type": "query alert",
-  "query": "sum(last_5m):default_zero(sum:trace.express.request.errors{service:checkout-service,env:staging,resource_name:post_/orders}.as_count()) > 5",
-  "message": "POST /orders on checkout-service (env:staging) is returning server errors.\n\nThe error may start downstream: check the trace for promo-service and inventory-service spans.\nRunbook: docs/RUNBOOK.md (Checkout 5xx section).\nLikely start: Error Tracking issues for service:checkout-service, then the linked trace and logs.\n\nBits AI SRE: investigate root cause (see docs/BITS_AI_SETUP.md).",
-  "tags": [
-    "service:checkout-service",
-    "env:staging",
-    "team:sandbox"
-  ],
+  "query": "sum(last_5m):sum:trace.express.request.errors{service:shoplite,env:sandbox,resource_name:post_/api/checkout}.as_count() > 5",
+  "message": "POST /api/checkout on {{service.name}} is returning server errors.\n\nRunbook: docs/RUNBOOK.md (Checkout 5xx section).\nLikely start: Error Tracking issues for service:shoplite, then the linked trace and logs.\n\nBits AI SRE: investigate root cause (see docs/BITS_AI_SETUP.md).",
+  "tags": ["service:shoplite", "env:sandbox", "team:sandbox"],
   "options": {
-    "thresholds": {
-      "critical": 5,
-      "warning": 1
-    },
+    "thresholds": { "critical": 5, "warning": 1 },
     "notify_no_data": false,
     "require_full_window": false,
     "include_tags": true,

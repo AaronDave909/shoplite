@@ -6,8 +6,6 @@ on:
   pull_request:
 
 jobs:
-  # Unit + HTTP tests for every service (npm workspaces). Database tests use PGlite,
-  # an in-memory Postgres, so no database service is needed.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -19,8 +17,8 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # Replays the incidents through all four services. Expected to FAIL on main until the
-  # intentional bugs are fixed; a Bits AI fix PR should turn its scenario green.
+  # Replays the checkout incident. Expected to FAIL on main until the bug is fixed;
+  # a Bits AI fix PR should turn this green.
   incident-validation:
     runs-on: ubuntu-latest
     steps:
@@ -31,11 +29,3 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run validate
-
-  # Checks docker-compose.yml and builds every service image.
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker compose config --quiet
-      - run: docker compose build

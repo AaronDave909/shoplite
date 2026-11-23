@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "shoplite-local",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "name": "shoplite",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--require", "dd-trace/init", "src/server.js"],
       "port": 3000
     }
   ]

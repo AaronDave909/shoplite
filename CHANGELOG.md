@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+<<<<<<< HEAD
 - Fix audited inventory reservations failing because their SQL referenced a nonexistent column and passed a non-boolean audit value.
 - Split the ShopLite monolith into four microservices run with Docker Compose:
   `storefront-service`, `checkout-service` (with `orders-db`), `promo-service` (with
@@ -18,6 +19,8 @@
   (in-memory Postgres). CI also builds every Docker image.
 - AGENTS.md: fix PRs must include a test and an entry in the affected service's
   "Incident & Fix Log".
+=======
+>>>>>>> parent of f71eb97 (feat: converted monolith to microservice environment)
 - Return a validation error instead of a checkout 500 for unknown or expired promotion codes.
 - Reject legacy promotions whose tiers have all expired instead of returning a null discount and causing a checkout 500.
 

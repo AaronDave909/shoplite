@@ -1,7 +1,7 @@
 # Incident: <title>
 
 - **Date:** YYYY-MM-DD
-- **Service / database / env:** <service> / <database> / staging
+- **Service / env:** shoplite / sandbox
 - **Datadog links:** Error Tracking issue, example trace, monitor
 - **Severity:** SEV-?
 

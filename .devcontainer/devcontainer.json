@@ -1,5 +1,5 @@
 {
-  "name": "ShopLite microservices + Datadog Agent",
+  "name": "ShopLite + Datadog Agent",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
@@ -13,19 +13,11 @@
       "description": "Your Datadog site, e.g. datadoghq.com (US1), us5.datadoghq.com, datadoghq.eu."
     }
   },
-  "forwardPorts": [
-    3000
-  ],
+  "forwardPorts": [3000],
   "portsAttributes": {
-    "3000": {
-      "label": "ShopLite storefront",
-      "onAutoForward": "openBrowser"
-    }
+    "3000": { "label": "ShopLite", "onAutoForward": "openBrowser" }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "postStartCommand": "bash .devcontainer/start-agent.sh",
-  "hostRequirements": {
-    "cpus": 4,
-    "memory": "8gb"
-  }
+  "hostRequirements": { "cpus": 2 }
 }
