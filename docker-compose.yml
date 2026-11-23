@@ -1,34 +1,218 @@
-# Runs the Datadog Agent (and optionally the app) in containers.
-# In GitHub Codespaces, .devcontainer/start-agent.sh starts only `datadog-agent`;
-# the app runs with `npm start` and reaches the Agent on localhost:8126.
-# DD_API_KEY / DD_SITE come from the shell environment (Codespaces secrets),
-# falling back to values in .env for local Docker use.
+# ShopLite microservices + Datadog Agent.
+#
+#   ./scripts/stack.sh up      # builds and starts everything (stamps DD_GIT_COMMIT_SHA)
+#   open http://localhost:3000
+#
+# DD_API_KEY / DD_SITE come from the shell environment (Codespaces secrets), falling back
+# to .env for local Docker use. Without DD_API_KEY, scripts/stack.sh starts the app
+# without the Agent.
+name: shoplite
+
+# ---------------------------------------------------------------------------
+# Shared settings
+# ---------------------------------------------------------------------------
+
+# Unified Service Tagging + tracer settings for every microservice. Each service adds
+# its own DD_SERVICE. DD_GIT_* lets Datadog link stack frames to the exact file and line.
+x-dd-service-env: &dd-service-env
+  DD_ENV: staging
+  DD_VERSION: ${DD_VERSION:-2.0.0}
+  DD_GIT_REPOSITORY_URL: ${DD_GIT_REPOSITORY_URL:-https://github.com/AaronDave909/shoplite}
+  DD_GIT_COMMIT_SHA: ${DD_GIT_COMMIT_SHA:-}
+  DD_AGENT_HOST: datadog-agent
+  DD_TRACE_AGENT_PORT: "8126"
+  DD_LOGS_INJECTION: "true"
+  DD_RUNTIME_METRICS_ENABLED: "true"
+  # Tags each SQL query with the calling service and trace, linking APM traces to DBM samples.
+  DD_DBM_PROPAGATION_MODE: full
+  CHAOS_ENABLED: ${CHAOS_ENABLED:-true}
+  LOG_LEVEL: info
+
+# Services don't wait for the Agent: dd-trace buffers and retries, and the app must run
+# without Datadog too.
+x-node-service: &node-service
+  restart: unless-stopped
+
+# Postgres 16 with what Database Monitoring needs: pg_stat_statements and longer query text.
+x-postgres: &postgres
+  image: postgres:16-alpine
+  restart: unless-stopped
+  command:
+    - postgres
+    - -c
+    - shared_preload_libraries=pg_stat_statements
+    - -c
+    - pg_stat_statements.track=all
+    - -c
+    - track_activity_query_size=4096
+    - -c
+    - track_io_timing=on
+    - -c
+    - max_connections=50
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 2s
+    timeout: 3s
+    retries: 30
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: shoplite
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shoplite}
+  DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:-datadog}
+
 services:
+  # -------------------------------------------------------------------------
+  # Datadog Agent: APM, container metrics, container logs, DBM
+  # -------------------------------------------------------------------------
   datadog-agent:
     image: gcr.io/datadoghq/agent:7
+    restart: unless-stopped
     environment:
-      DD_API_KEY: ${DD_API_KEY:?Set DD_API_KEY (Codespaces secret or .env)}
+      DD_API_KEY: ${DD_API_KEY:-}
       DD_SITE: ${DD_SITE:-datadoghq.com}
-      DD_ENV: sandbox
+      DD_ENV: staging
+      DD_HOSTNAME: shoplite-staging
       DD_APM_ENABLED: "true"
       DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
       DD_LOGS_ENABLED: "true"
-      DD_HOSTNAME: shoplite-sandbox
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      DD_CONTAINER_EXCLUDE_LOGS: "name:datadog-agent"
+      DD_PROCESS_CONFIG_PROCESS_COLLECTION_ENABLED: "true"
+      # Used by the DBM check config in the database containers' labels (%%env_DD_POSTGRES_PASSWORD%%).
+      DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:-datadog}
     volumes:
-      - ./datadog/conf.d/nodejs.d:/conf.d/nodejs.d:ro
-      - ./logs:/app/logs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
     ports:
       - "8126:8126"
 
-  shoplite:
-    build: .
-    env_file: .env
+  # -------------------------------------------------------------------------
+  # Microservices
+  # -------------------------------------------------------------------------
+  storefront-service:
+    <<: *node-service
+    build: { context: ., dockerfile: services/storefront/Dockerfile }
+    image: shoplite/storefront-service:${DD_VERSION:-2.0.0}
     environment:
-      DD_AGENT_HOST: datadog-agent
-      LOG_FILE: /app/logs/shoplite.log
-    volumes:
-      - ./logs:/app/logs
+      <<: *dd-service-env
+      DD_SERVICE: storefront-service
+      CHECKOUT_SERVICE_URL: http://checkout-service:3000
+      PROMO_SERVICE_URL: http://promo-service:3000
+      INVENTORY_SERVICE_URL: http://inventory-service:3000
+    labels:
+      com.datadoghq.tags.service: storefront-service
+      com.datadoghq.tags.env: staging
+      com.datadoghq.tags.version: ${DD_VERSION:-2.0.0}
+      com.datadoghq.ad.logs: '[{"source": "nodejs", "service": "storefront-service"}]'
     ports:
       - "3000:3000"
+
+  checkout-service:
+    <<: *node-service
+    build: { context: ., dockerfile: services/checkout/Dockerfile }
+    image: shoplite/checkout-service:${DD_VERSION:-2.0.0}
+    environment:
+      <<: *dd-service-env
+      DD_SERVICE: checkout-service
+      DATABASE_URL: postgres://shoplite:${POSTGRES_PASSWORD:-shoplite}@orders-db:5432/orders
+      PG_POOL_MAX: "10"
+      PG_CONNECTION_TIMEOUT_MS: "3000"
+      AUDIT_THRESHOLD_CENTS: "50000"
+      PROMO_SERVICE_URL: http://promo-service:3000
+      INVENTORY_SERVICE_URL: http://inventory-service:3000
+    labels:
+      com.datadoghq.tags.service: checkout-service
+      com.datadoghq.tags.env: staging
+      com.datadoghq.tags.version: ${DD_VERSION:-2.0.0}
+      com.datadoghq.ad.logs: '[{"source": "nodejs", "service": "checkout-service"}]'
     depends_on:
-      - datadog-agent
+      orders-db: { condition: service_healthy }
+
+  promo-service:
+    <<: *node-service
+    build: { context: ., dockerfile: services/promo/Dockerfile }
+    image: shoplite/promo-service:${DD_VERSION:-2.0.0}
+    # The crash button allocates past this limit, so the kernel OOM-kills the container
+    # (exit 137, OOMKilled) and Docker restarts it.
+    mem_limit: 256m
+    environment:
+      <<: *dd-service-env
+      DD_SERVICE: promo-service
+      DATABASE_URL: postgres://shoplite:${POSTGRES_PASSWORD:-shoplite}@promo-db:5432/promo
+      CHAOS_CRASH_ALLOC_MB: "768"
+    labels:
+      com.datadoghq.tags.service: promo-service
+      com.datadoghq.tags.env: staging
+      com.datadoghq.tags.version: ${DD_VERSION:-2.0.0}
+      com.datadoghq.ad.logs: '[{"source": "nodejs", "service": "promo-service"}]'
+    depends_on:
+      promo-db: { condition: service_healthy }
+
+  inventory-service:
+    <<: *node-service
+    build: { context: ., dockerfile: services/inventory/Dockerfile }
+    image: shoplite/inventory-service:${DD_VERSION:-2.0.0}
+    environment:
+      <<: *dd-service-env
+      DD_SERVICE: inventory-service
+      DATABASE_URL: postgres://shoplite:${POSTGRES_PASSWORD:-shoplite}@inventory-db:5432/inventory
+    labels:
+      com.datadoghq.tags.service: inventory-service
+      com.datadoghq.tags.env: staging
+      com.datadoghq.tags.version: ${DD_VERSION:-2.0.0}
+      com.datadoghq.ad.logs: '[{"source": "nodejs", "service": "inventory-service"}]'
+    depends_on:
+      inventory-db: { condition: service_healthy }
+
+  # -------------------------------------------------------------------------
+  # One database per service. The Agent discovers each one from its labels and runs the
+  # postgres check with DBM on (query metrics, samples, explain plans, blocking locks).
+  # -------------------------------------------------------------------------
+  orders-db:
+    <<: *postgres
+    environment:
+      <<: *postgres-env
+      POSTGRES_DB: orders
+    volumes:
+      - ./datadog/postgres/00-datadog-setup.sh:/docker-entrypoint-initdb.d/00-datadog-setup.sh:ro
+      - orders-db-data:/var/lib/postgresql/data
+    labels:
+      com.datadoghq.tags.service: orders-db
+      com.datadoghq.tags.env: staging
+      com.datadoghq.ad.checks: '{"postgres": {"init_config": {}, "instances": [{"dbm": true, "host": "%%host%%", "port": 5432, "username": "datadog", "password": "%%env_DD_POSTGRES_PASSWORD%%", "dbname": "orders", "tags": ["service:orders-db", "env:staging", "owner:checkout-service"]}]}}'
+      com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "orders-db"}]'
+
+  promo-db:
+    <<: *postgres
+    environment:
+      <<: *postgres-env
+      POSTGRES_DB: promo
+    volumes:
+      - ./datadog/postgres/00-datadog-setup.sh:/docker-entrypoint-initdb.d/00-datadog-setup.sh:ro
+      - promo-db-data:/var/lib/postgresql/data
+    labels:
+      com.datadoghq.tags.service: promo-db
+      com.datadoghq.tags.env: staging
+      com.datadoghq.ad.checks: '{"postgres": {"init_config": {}, "instances": [{"dbm": true, "host": "%%host%%", "port": 5432, "username": "datadog", "password": "%%env_DD_POSTGRES_PASSWORD%%", "dbname": "promo", "tags": ["service:promo-db", "env:staging", "owner:promo-service"]}]}}'
+      com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "promo-db"}]'
+
+  inventory-db:
+    <<: *postgres
+    environment:
+      <<: *postgres-env
+      POSTGRES_DB: inventory
+    volumes:
+      - ./datadog/postgres/00-datadog-setup.sh:/docker-entrypoint-initdb.d/00-datadog-setup.sh:ro
+      - inventory-db-data:/var/lib/postgresql/data
+    labels:
+      com.datadoghq.tags.service: inventory-db
+      com.datadoghq.tags.env: staging
+      com.datadoghq.ad.checks: '{"postgres": {"init_config": {}, "instances": [{"dbm": true, "host": "%%host%%", "port": 5432, "username": "datadog", "password": "%%env_DD_POSTGRES_PASSWORD%%", "dbname": "inventory", "tags": ["service:inventory-db", "env:staging", "owner:inventory-service"]}]}}'
+      com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "inventory-db"}]'
+
+volumes:
+  orders-db-data:
+  promo-db-data:
+  inventory-db-data:
