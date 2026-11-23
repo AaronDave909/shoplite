@@ -31,6 +31,15 @@ test('reserving deducts stock and returns priced lines', async () => {
   assert.equal(await stockOf('mug'), 9997);
 });
 
+test('audited reservations set the database audit flag', async () => {
+  const { reservationId } = await reserveStock(db, {
+    items: [{ productId: 'hoodie', quantity: 1 }],
+    audit: true,
+  });
+  const { rows } = await db.query('SELECT audit_flag FROM reservations WHERE id = $1', [reservationId]);
+  assert.deepEqual(rows, [{ audit_flag: true }]);
+});
+
 test('not enough stock is a 409 and deducts nothing', async () => {
   await assert.rejects(
     reserveStock(db, { items: [{ productId: 'hoodie', quantity: 1 }, { productId: 'mug', quantity: 999999 }] }),
