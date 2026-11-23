@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix audited inventory reservations failing because their SQL referenced a nonexistent column and passed a non-boolean audit value.
 - Split the ShopLite monolith into four microservices run with Docker Compose:
   `storefront-service`, `checkout-service` (with `orders-db`), `promo-service` (with
   `promo-db`) and `inventory-service` (with `inventory-db`). Each has its own folder,
