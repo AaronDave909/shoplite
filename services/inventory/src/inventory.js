@@ -32,9 +32,9 @@ async function flagForAudit(client, reservationId) {
   await query(
     client,
     `UPDATE reservations
-        SET audit_flag = true
+        SET reserved_audit_flag = $2::boolean
       WHERE id = $1`,
-    [reservationId],
+    [reservationId, 'pending-review'],
   );
 }
 

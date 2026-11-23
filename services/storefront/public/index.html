@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShopLite</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>ShopLite</h1>
+    <p class="sub">Microservices sandbox for Datadog APM, DBM, Error Tracking and Bits AI.</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="status-h">
+      <div class="row">
+        <h2 id="status-h">Service status</h2>
+        <span class="muted small" id="status-at">checking…</span>
+      </div>
+      <ul id="status" class="status" aria-live="polite"></ul>
+      <p id="restarts" class="muted small"></p>
+    </section>
+
+    <section aria-labelledby="shop-h">
+      <h2 id="shop-h">Products</h2>
+      <ul id="products" class="products"><li class="muted">Loading from inventory-service…</li></ul>
+      <label for="promo">Promo code</label>
+      <input id="promo" placeholder="SAVE10, WELCOME5, …" autocomplete="off" />
+      <div class="actions">
+        <button id="checkout">Place order</button>
+      </div>
+    </section>
+
+    <section class="danger" aria-labelledby="chaos-h">
+      <h2 id="chaos-h">Chaos &amp; Crash Testing Panel</h2>
+      <p class="muted">Each button breaks something on purpose. Watch the status bar above, then follow the trail in Datadog.</p>
+
+      <article class="chaos">
+        <span class="tag">App Cross-Service Bug</span>
+        <h3>Trigger Cascading Promo Null Error</h3>
+        <p>Checks out with <code>LEGACY_VIP</code>: storefront → checkout → promo. promo-service answers
+          <code>200 OK</code> with a <code>null</code> discount, so checkout-service throws a <code>TypeError</code> (500).
+          The error surfaces in checkout; the cause is in promo.</p>
+        <div class="actions">
+          <button class="warn" data-chaos="promo-null-error">Trigger once</button>
+          <button class="warn ghost" data-chaos="promo-null-error" data-repeat="20">Trigger ×20</button>
+        </div>
+      </article>
+
+      <article class="chaos">
+        <span class="tag">App Process Crash</span>
+        <h3>Kill Promo Service Process (OOM / Fatal Exit)</h3>
+        <p>promo-service allocates memory past its container limit and exits. Docker restarts it
+          (<code>restart: unless-stopped</code>). Storefront and inventory stay up; orders without a promo code still go through.</p>
+        <div class="actions">
+          <button class="warn" data-chaos="promo-crash">Crash promo-service</button>
+        </div>
+      </article>
+
+      <article class="chaos">
+        <span class="tag">Database Code Bug</span>
+        <h3>Trigger Inventory DB Schema / Query Crash</h3>
+        <p>Asks inventory-service for an audited stock reservation. Its SQL references a column that doesn't exist
+          (<code>reserved_audit_flag</code>) with a bad boolean cast, so inventory-db rejects it (500).
+          Real orders over $500 take this path too.</p>
+        <div class="actions">
+          <button class="warn" data-chaos="inventory-db-bug">Trigger once</button>
+          <button class="warn ghost" data-chaos="inventory-db-bug" data-repeat="20">Trigger ×20</button>
+        </div>
+      </article>
+
+      <article class="chaos">
+        <span class="tag">Database Resource Crash</span>
+        <h3>Exhaust Orders DB Connections &amp; Row Lock</h3>
+        <p>checkout-service opens transactions that hold a <code>FOR UPDATE</code> lock on the order counter and
+          take every pool connection. New orders wait, then time out. Everything is rolled back after the hold time.</p>
+        <div class="fields">
+          <label>Connections <input id="lock-conns" type="number" min="1" max="50" value="10" /></label>
+          <label>Hold (seconds) <input id="lock-hold" type="number" min="1" max="300" value="45" /></label>
+        </div>
+        <div class="actions">
+          <button class="warn" data-chaos="orders-db-lock">Lock orders-db</button>
+          <button class="ghost-accent" id="probe">Place probe order</button>
+        </div>
+      </article>
+    </section>
+
+    <section aria-labelledby="log-h">
+      <div class="row">
+        <h2 id="log-h">Activity</h2>
+        <button class="link" id="clear">Clear</button>
+      </div>
+      <ol id="log" class="log"><li class="muted">Nothing yet.</li></ol>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

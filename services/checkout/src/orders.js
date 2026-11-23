@@ -72,7 +72,6 @@ async function placeOrder({ db, clients, auditThresholdCents = 50_000 }, { items
   let discountCents = 0;
   if (code) {
     const promo = await clients.promo.validate(code, subtotalCents);
-    if (!promo?.discount) throw new ValidationError(`Unknown or expired promotion code: ${code}`);
     discountCents = promo.discount.amountCents;
   }
 

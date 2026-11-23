@@ -57,22 +57,6 @@ test('legacy tiers: best live tier the cart qualifies for', () => {
   assert.deepEqual(evaluateLegacyRules(rules, 20000, new Date('2026-01-01')), { percent: 20, amountCents: 4000 });
 });
 
-test('rejects a legacy code when all of its tiers have expired', async () => {
-  await db.query(
-    `INSERT INTO promotions (code, rule_type, percent, legacy_rules, expires_on)
-     VALUES ($1, 'legacy_tiered', NULL, $2::jsonb, $3)`,
-    [
-      'LEGACY_EXPIRED_TIERS',
-      JSON.stringify([{ minSubtotalCents: 0, percent: 15, validUntil: '2024-06-30' }]),
-      '2099-12-31',
-    ],
-  );
-  await assert.rejects(
-    validatePromotion(db, 'LEGACY_EXPIRED_TIERS', 1000, new Date('2026-01-01')),
-    isInvalidCode,
-  );
-});
-
 test('POST /promotions/validate returns the discount', async () => {
   const res = await fetch(`${base}/promotions/validate`, {
     method: 'POST',

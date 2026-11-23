@@ -47,11 +47,3 @@ npm test -w services/promo
   `validatePromotion` in `src/promotions.js` during the microservices split.
 - **Validation steps:** `test/promotions.test.js` ("BLACKFRIDAY is valid through the end of
   its last day, then rejected"); `npm run validate` scenario "expired promo BLACKFRIDAY" is 400.
-
-### 2026-11-23: Reject legacy promotions with expired tiers
-
-- **Root cause:** Before the fix, `src/promotions.js:56` returned `{ discount: null }` when `evaluateLegacyRules` found no live tier, despite `validatePromotion` documenting a discount object; checkout then threw `TypeError: Cannot read properties of null (reading 'amountCents')` and returned 500.
-- **Affected service / database:** `promo-service` / `promo-db`; `checkout-service` surfaced the malformed success response as a 500.
-- **Datadog links:** [Bits investigation](https://app.datadoghq.com/bits-ai/investigations/5da71a10-1697-4466-bc6f-343da8857fcf?type=CONCLUSION).
-- **Fix:** `validatePromotion` now raises `ValidationError` for a legacy code with no live tier, and the `LEGACY_VIP` seed expiry is corrected to `2024-06-30` so its stale tiers cannot be represented as an active code.
-- **Validation steps:** `test/promotions.test.js` ("rejects a legacy code when all of its tiers have expired"); `npm test`; `npm run validate`; in the running stack, submit `LEGACY_VIP` through the checkout flow and expect HTTP 400 rather than 500.
