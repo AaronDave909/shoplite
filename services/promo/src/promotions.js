@@ -53,6 +53,10 @@ async function validatePromotion(db, code, subtotalCents, now = new Date()) {
       ? evaluateLegacyRules(promo.legacy_rules, subtotalCents, now)
       : percentOff(subtotalCents, promo.percent);
 
+  if (!discount) {
+    throw new ValidationError(`Unknown or expired promotion code: ${code}`);
+  }
+
   return { code: promo.code, ruleType: promo.rule_type, discount };
 }
 

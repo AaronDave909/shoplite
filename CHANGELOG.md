@@ -18,6 +18,7 @@
 - AGENTS.md: fix PRs must include a test and an entry in the affected service's
   "Incident & Fix Log".
 - Return a validation error instead of a checkout 500 for unknown or expired promotion codes.
+- Reject legacy promotions whose tiers have all expired instead of returning a null discount and causing a checkout 500.
 
 ## 1.0.0
 
