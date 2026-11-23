@@ -1,37 +1,46 @@
 'use strict';
-// Incident validation: replays the production scenarios against a local server and
-// fails if any of them returns a 5xx or the wrong status. A fix for the checkout
-// incident is "validated" when this script exits 0 (it fails on the unfixed code).
-process.env.NODE_ENV = 'test';
+// Incident validation: starts all four services (real HTTP between them, real Postgres SQL
+// via PGlite) and replays the production scenarios through the storefront. Exits 1 if any
+// scenario gets the wrong status. It FAILS on main on purpose until the two intentional
+// code bugs are fixed:
+//   - LEGACY_VIP (expired legacy tiers) must be a 400, not a checkout-service 500
+//   - high-value orders (audited reservations) must succeed, not hit an inventory-db error
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'silent';
-const { createApp } = require('../src/app');
+const { startLocalStack } = require('./lib/local-stack');
 
+const mug = [{ productId: 'mug', quantity: 1 }];
 const scenarios = [
-  { name: 'no promo', body: { items: [{ productId: 'mug', quantity: 1 }] }, expect: 201 },
-  { name: 'active promo', body: { items: [{ productId: 'mug', quantity: 1 }], promoCode: 'SAVE10' }, expect: 201 },
-  { name: 'expired promo BLACKFRIDAY', body: { items: [{ productId: 'mug', quantity: 1 }], promoCode: 'BLACKFRIDAY' }, expect: 400 },
-  { name: 'unknown promo', body: { items: [{ productId: 'mug', quantity: 1 }], promoCode: 'NOTACODE' }, expect: 400 },
+  { name: 'order without promo', body: { items: mug }, expect: 201 },
+  { name: 'order with active promo SAVE10', body: { items: mug, promoCode: 'SAVE10' }, expect: 201 },
+  { name: 'expired promo BLACKFRIDAY', body: { items: mug, promoCode: 'BLACKFRIDAY' }, expect: 400 },
+  { name: 'unknown promo', body: { items: mug, promoCode: 'NOTACODE' }, expect: 400 },
   { name: 'empty cart', body: { items: [] }, expect: 400 },
+  { name: 'more than in stock', body: { items: [{ productId: 'mug', quantity: 999999 }] }, expect: 409 },
+  { name: 'legacy promo LEGACY_VIP with only expired tiers', body: { items: mug, promoCode: 'LEGACY_VIP' }, expect: 400 },
+  { name: 'high-value order (audited stock reservation)', body: { items: [{ productId: 'hoodie', quantity: 10 }] }, expect: 201 },
 ];
 
 (async () => {
-  const server = createApp().listen(0);
-  await new Promise((r) => server.once('listening', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const stack = await startLocalStack();
   let failed = 0;
-
-  for (const s of scenarios) {
-    const res = await fetch(`${base}/api/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(s.body),
-    });
-    const ok = res.status === s.expect;
-    if (!ok) failed++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  ${s.name}: got ${res.status}, expected ${s.expect}`);
+  try {
+    for (const s of scenarios) {
+      const res = await fetch(`${stack.urls.storefront}/api/checkout`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(s.body),
+      });
+      const body = await res.json().catch(() => ({}));
+      const ok = res.status === s.expect;
+      if (!ok) failed++;
+      console.log(`${ok ? 'PASS' : 'FAIL'}  ${s.name}: got ${res.status}, expected ${s.expect}${ok ? '' : `  ${JSON.stringify(body)}`}`);
+    }
+  } finally {
+    await stack.close();
   }
-
-  server.close();
   console.log(failed ? `\n${failed} scenario(s) failed.` : '\nAll scenarios passed.');
   process.exit(failed ? 1 : 0);
-})();
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
