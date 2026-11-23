@@ -1,14 +1,7 @@
 'use strict';
 const { getProduct } = require('./catalog');
 const { calculateDiscount } = require('./promotions');
-
-class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-    this.status = 400;
-  }
-}
+const { ValidationError } = require('./errors');
 
 function priceCart({ items, promoCode } = {}) {
   if (!Array.isArray(items) || items.length === 0) {
