@@ -1,0 +1,20 @@
+# Telemetry-only override: run ShopLite with NO Source Code Integration tags, to see what
+# Bits AI can do from traces, logs, metrics and DBM alone (no repo access).
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.no-code.yml ./scripts/stack.sh up
+#
+# Also remove the shoplite repo from the Datadog GitHub App (github.com/settings/installations),
+# otherwise Datadog can still read the code through the integration.
+x-no-git: &no-git
+  DD_GIT_REPOSITORY_URL: ""
+  DD_GIT_COMMIT_SHA: ""
+
+services:
+  storefront-service:
+    environment: *no-git
+  checkout-service:
+    environment: *no-git
+  promo-service:
+    environment: *no-git
+  inventory-service:
+    environment: *no-git
